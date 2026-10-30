@@ -7,3 +7,4 @@ melainkan "mengerti atau tidak" — isi kolom terakhir dengan apa yang Anda ubah
 | Tanggal | Siapa (NIM) | Alat | Untuk apa | Apa yang diubah dari keluarannya |
 |---|---|---|---|---|
 | 2026-11-03 | 12345678 | Copilot | kerangka DataLoader | ganti normalisasi, tambah seed worker |
+| 2026-10-31 | 123450104 | Codex (OpenAI) | Menyusun draf protokol, status manifest, dan pesan pemuat untuk Sprint 0 | Draf disesuaikan dengan kartu kasus; parameter yang belum diketahui dibiarkan terbuka. Belum ditinjau tim/pembimbing. |

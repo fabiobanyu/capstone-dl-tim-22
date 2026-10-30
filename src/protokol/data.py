@@ -20,14 +20,14 @@ import numpy as np
 
 from src.common import manifest, split
 
-TUGAS = "klasifikasi"
+TUGAS = "regresi"
 
 
 def muat():
     """Ganti isi fungsi ini dengan pemuat dataset kasus tim Anda."""
-    m = manifest.baca()
     raise NotImplementedError(
-        f"Isi src/protokol/data.py untuk dataset {m.get('sumber', '?')} (lihat contoh_fashion_mnist.py)."
+        "Rekaman kipas dan protokol pembagian per grup belum tersedia/disetujui. "
+        "Lengkapi pemuat setelah format data dan aturan split disepakati pembimbing."
     )
     # --- pola yang lazim ---------------------------------------------------------------
     # import pandas as pd
