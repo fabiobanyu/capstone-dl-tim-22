@@ -8,3 +8,4 @@ melainkan "mengerti atau tidak" — isi kolom terakhir dengan apa yang Anda ubah
 |---|---|---|---|---|
 | 2026-11-03 | 12345678 | Copilot | kerangka DataLoader | ganti normalisasi, tambah seed worker |
 | 2026-10-31 | 123450104 | Codex (OpenAI) | Menyusun draf protokol, status manifest, dan pesan pemuat untuk Sprint 0 | Draf disesuaikan dengan kartu kasus; parameter yang belum diketahui dibiarkan terbuka. Belum ditinjau tim/pembimbing. |
+| 2026-10-31 | 123450104 | Codex (OpenAI) | Memperbaiki pemanggilan baseline dan tabel regresi di run_all.py | Menggunakan baseline bawaan yang ada; pengujian memakai data buatan hanya untuk memeriksa kode. Belum ditinjau tim. |
