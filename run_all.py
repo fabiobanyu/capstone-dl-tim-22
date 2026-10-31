@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -19,7 +20,8 @@ AKAR = Path(__file__).resolve().parent
 
 def jalankan(perintah: list[str]) -> None:
     print("$", " ".join(perintah), flush=True)
-    subprocess.run(perintah, check=True, cwd=AKAR)
+    env = {**os.environ, "PYTHONIOENCODING": "utf-8"}
+    subprocess.run(perintah, check=True, cwd=AKAR, env=env)
 
 
 def main() -> None:
@@ -31,7 +33,7 @@ def main() -> None:
     a = ap.parse_args()
 
     if not a.tanpa_baseline:
-        jalankan([sys.executable, "-m", "src.common.baseline_mlp", "--seed", str(a.seeds[0])])
+        jalankan([sys.executable, "-m", "src.common.baseline", "--seed", str(a.seeds[0])])
     anggota = sorted(p for p in (AKAR / "models").iterdir() if p.is_dir() and (p / "run.py").exists()
                      and p.name != "TEMPLATE" and (a.hanya is None or p.name in a.hanya))
     ringkas: dict[str, list[dict]] = {}
@@ -44,20 +46,29 @@ def main() -> None:
             hasil = json.loads((AKAR / "results" / m.name / "metrics.json").read_text("utf-8"))
             ringkas.setdefault(m.name, []).append(hasil)
 
-    baris = ["| NIM | Model | seed | val_acc | val_macro_f1 | test_acc | durasi (s) | perangkat |", "|---|---|---|---|---|---|---|---|"]
+    from src.protokol import data
+
+    regresi = data.TUGAS == "regresi"
+    kolom = ("val_mae", "val_rmse", "test_mae") if regresi else ("val_acc", "val_macro_f1", "test_acc")
+    baris = [f"| NIM | Model | seed | {kolom[0]} | {kolom[1]} | {kolom[2]} | durasi (s) | perangkat |", "|---|---|---|---|---|---|---|---|"]
+
+    def baris_hasil(nim: str, h: dict) -> str:
+        mt = h["metrik"]
+        angka = [f"{mt[k]:.4f}" if k in mt else "—" for k in kolom]
+        return (f"| {nim} | {h.get('model', '')} | {h['seed']} | "
+                f"{' | '.join(angka)} | {h.get('durasi_detik', 0):.0f} | {h.get('perangkat', '')} |")
+
     bl = AKAR / "results" / "baseline" / "metrics.json"
     if bl.exists():
-        h = json.loads(bl.read_text("utf-8")); mt = h["metrik"]
-        baris.append(f"| baseline | mlp dosen | {h['seed']} | {mt['val_acc']:.4f} | {mt['val_macro_f1']:.4f} | — | {h.get('durasi_detik', 0):.0f} | {h.get('perangkat', '')} |")
+        h = json.loads(bl.read_text("utf-8"))
+        baris.append(baris_hasil("baseline", h))
     for nim, daftar in ringkas.items():
         for h in daftar:
-            mt = h["metrik"]
-            baris.append(f"| {nim} | {h.get('model', '')} | {h['seed']} | {mt['val_acc']:.4f} | {mt['val_macro_f1']:.4f} | "
-                         f"{mt.get('test_acc', float('nan')):.4f} | {h.get('durasi_detik', 0):.0f} | {h.get('perangkat', '')} |")
+            baris.append(baris_hasil(nim, h))
     (AKAR / "reports").mkdir(exist_ok=True)
     out = AKAR / "reports" / "hasil_komparasi.md"
     out.write_text("# Hasil komparasi (dibangkitkan run_all.py)\n\n" + "\n".join(baris) + "\n", encoding="utf-8")
-    print("tabel komparasi →", out.relative_to(AKAR))
+    print("tabel komparasi:", out.relative_to(AKAR))
 
 
 if __name__ == "__main__":

@@ -1,5 +1,5 @@
 {
-  "sumber": "https://… (tautan dataset dari kartu Kasus tim di Workbench)",
-  "berkas": ["data/latih.csv"],
-  "catatan": "Isi pada Sprint 0: versi/tanggal unduh, jumlah baris, dan perubahan (bila ada). Berkas data sendiri tidak di-commit."
+  "sumber": "Rekaman primer tim di meja uji; belum tersedia. Tautan kartu kasus https://github.com/sains-data/capstone-dl-2026-starter adalah starter, bukan berkas rekaman.",
+  "berkas": [],
+  "catatan": "Draf: isi daftar rekaman dan metadata yang benar setelah diperoleh. Manifest belum valid untuk perhitungan data_hash."
 }
