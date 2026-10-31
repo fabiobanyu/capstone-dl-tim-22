@@ -32,3 +32,19 @@ Membangun model Autoencoder untuk mempelajari representasi fitur audio kipas dan
 
 ## Status
 Rancangan awal. Implementasi dan pelatihan menunggu pemuat dataset tim tersedia.
+
+## Hasil Uji Awal Arsitektur
+- Tanggal: 31 Oktober 2026
+- Status: Berhasil
+- Input uji: Tensor acak berukuran (4, 64).
+- Output rekonstruksi: (4, 64).
+- Output prediksi PWM: (4,).
+- Framework: PyTorch CPU.
+- Catatan: Uji ini hanya memeriksa bentuk keluaran model, bukan performa prediksi pada dataset sebenarnya.
+
+## Pekerjaan yang Belum Dilakukan
+- Pelatihan menggunakan rekaman audio kipas.
+- Evaluasi MAE, RMSE, dan R².
+- Pengujian dengan 3 seeds.
+- Ekspor model ke ONNX.
+- Pengukuran ukuran model dan latensi.
