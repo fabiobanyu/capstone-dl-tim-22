@@ -1,0 +1,40 @@
+# Rencana eksperimen tim 22: Taksiran kecepatan kipas dari suara (regresi)
+# Label: Otomatis: duty PWM kipas
+tim: 22
+judul: Taksiran kecepatan kipas dari suara (regresi)
+pembimbing: Christyan Tamaro Nadeak
+pilar: Mesin dan energi
+seed: 1022
+ulangan: 15
+durasi_kondisi_detik: 20
+jeda_detik: 2
+rekam:
+  audio:
+    aktif: true
+    sample_rate: 16000
+  kamera:
+    aktif: false
+faktor:
+  kipas:
+    - 0
+    - 32
+    - 64
+    - 96
+    - 128
+    - 160
+    - 192
+    - 224
+    - 255
+  pompa:
+    - 0
+    - 200
+metode:
+  jenis_tugas: Regresi
+  masukan_model: Log-mel 64 pita, 1 s
+  metrik_utama: MAE (% duty)
+  jalur:
+    - CNN
+    - TL
+    - Transformer
+    - AE
+  pembanding_non_dl: MFCC rata-rata dan simpangan + Random Forest/SVM
