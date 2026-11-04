@@ -128,20 +128,14 @@ def _cari_csv_metadata(folder: Path) -> Path:
 def muat(folder_sesi: str | Path | None = None):
     """Memuat dataset suara kipas Tim 22 sesuai protokol pembagian per ulangan."""
     folder = _cari_folder_sesi(folder_sesi)
-    kandidat_csv = list(folder.glob("*.csv")) or list(manifest.AKAR.glob("LEMBAR_SESI*.csv"))
-    if not kandidat_csv:
-        raise FileNotFoundError(f"Tidak ditemukan berkas CSV metadata di {folder}")
-    df = pd.read_csv(kandidat_csv[0])
     berkas_csv = _cari_csv_metadata(folder)
     df = pd.read_csv(berkas_csv)
 
-    kol_ulangan = next(c for c in ("Ulangan", "ulangan", "rep") if c in df.columns)
     kol_ulangan = next((c for c in ("Ulangan", "ulangan", "rep") if c in df.columns), None)
     if kol_ulangan is None:
         raise ValueError(f"Berkas {berkas_csv.name} tidak memiliki kolom nomor ulangan ('Ulangan'/'ulangan'/'rep').")
 
     kol_audio = next((c for c in ("file_audio", "audio", "file", "path") if c in df.columns), None)
-    daftar_wav = sorted((folder / "audio").glob("*.wav")) if kol_audio is None else []
     folder_audio = folder / "audio"
     daftar_wav = sorted(folder_audio.glob("*.wav")) if folder_audio.is_dir() else []
 
@@ -160,7 +154,6 @@ def muat(folder_sesi: str | Path | None = None):
 
     data = {k: {"X": [], "y": [], "u": set()} for k in ("latih", "val", "uji")}
 
-    for idx, row in df.iterrows():
     for i, (_, row) in enumerate(df.iterrows()):
         u = _nomor_ulangan(row[kol_ulangan])
         if u in ulangan_latih:
@@ -173,10 +166,8 @@ def muat(folder_sesi: str | Path | None = None):
         if kol_audio is not None:
             path_wav = Path(str(row[kol_audio]))
             if not path_wav.is_file():
-                path_wav = folder / "audio" / path_wav.name
                 path_wav = folder_audio / path_wav.name
         else:
-            path_wav = daftar_wav[idx]
             if i >= len(daftar_wav):
                 raise IndexError(
                     f"Jumlah baris metadata ({len(df)}) melebihi jumlah berkas audio ({len(daftar_wav)})."
