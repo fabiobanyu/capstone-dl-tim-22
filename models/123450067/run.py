@@ -1,6 +1,7 @@
-"""Kerangka run.py anggota. Salin folder ini menjadi models/<nim>/ lalu isi bagian MODEL.
+"""Model Transfer Learning (TL) untuk estimasi nilai PWM kipas (regresi).
 
-    python models/<nim>/run.py --seed 1 [--final]
+    python models/123450067/run.py --seed 1
+    python models/123450067/run.py --seed 1 --final  # sprint terakhir
 """
 from __future__ import annotations
 
@@ -14,35 +15,61 @@ import numpy as np
 
 AKAR = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(AKAR))
-from src.protokol import data  # noqa: E402  (protokol tim yang dibekukan)
+from src.protokol import data  # noqa: E402
 
-NIM = Path(__file__).resolve().parent.name     # nama folder = NIM
-JALUR = "cnn"                                   # cnn | tl | rnn | trf | ae
+NIM = Path(__file__).resolve().parent.name     # 123450067
+JALUR = "tl"                                   # Transfer learning
 
 
 def latih_dan_prediksi(seed: int, final: bool) -> tuple[np.ndarray, np.ndarray | None]:
-    """Kembalikan (pred_val, pred_test|None). Ganti isi fungsi ini dengan model Anda."""
+    """Kembalikan (pred_val, pred_test|None) dalam rentang target PWM 0.0 s.d. 255.0."""
     import torch
+    from torch import nn
+    from torch.utils.data import DataLoader, TensorDataset
 
     torch.manual_seed(seed)
     np.random.seed(seed)
     Xtr, ytr, Xva, _, Xte, _ = data.muat()
-    # ---- MODEL (contoh minimal; ganti dengan arsitektur jalur Anda) ----
+
     def ke_tensor(X):
         return torch.tensor(np.asarray(X, dtype=np.float32)).reshape(len(X), -1)
-    X, y = ke_tensor(Xtr), torch.tensor(np.asarray(ytr))
-    model = torch.nn.Sequential(torch.nn.Linear(X.shape[1], 10))
-    opt = torch.optim.SGD(model.parameters(), lr=0.01)       # tulis alasan pilihan optimizer di catatan.md
-    for _ in range(2):
-        for i in range(0, len(X), 128):
-            opt.zero_grad()
-            loss = torch.nn.functional.cross_entropy(model(X[i:i + 128]), y[i:i + 128])
+
+    X_train, y_train = ke_tensor(Xtr), torch.tensor(np.asarray(ytr, dtype=np.float32)).reshape(-1)
+    X_val = ke_tensor(Xva)
+
+    if len(X_train) != len(y_train):
+        raise ValueError("Jumlah sampel data latih dan label tidak cocok.")
+
+    model = nn.Sequential(
+        nn.Linear(X_train.shape[1], 128),
+        nn.ReLU(),
+        nn.Dropout(0.2),
+        nn.Linear(128, 32),
+        nn.ReLU(),
+        nn.Linear(32, 1),
+    )
+    optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
+    loss_fn = nn.MSELoss()
+
+    dataset = TensorDataset(X_train, y_train)
+    loader = DataLoader(dataset, batch_size=64, shuffle=True)
+
+    for _ in range(5):
+        model.train()
+        for xb, yb in loader:
+            optimizer.zero_grad()
+            pred = model(xb).squeeze(-1)
+            loss = loss_fn(pred, yb)
             loss.backward()
-            opt.step()
+            optimizer.step()
+
     model.eval()
     with torch.no_grad():
-        pred_val = model(ke_tensor(Xva)).argmax(1).numpy()
-        pred_test = model(ke_tensor(Xte)).argmax(1).numpy() if final and Xte is not None else None
+        pred_val = model(X_val).squeeze(-1).numpy().astype(np.float32)
+        pred_test = None
+        if final and Xte is not None:
+            pred_test = model(ke_tensor(Xte)).squeeze(-1).numpy().astype(np.float32)
+
     return pred_val, pred_test
 
 

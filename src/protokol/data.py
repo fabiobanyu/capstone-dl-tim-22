@@ -85,15 +85,18 @@ def _nomor_ulangan(val) -> int:
     return int(str(val).lower().replace("rep", "").strip())
 
 
-def _duty_rasio(row: pd.Series) -> float:
-    """Mengembalikan target duty dalam skala kontinu 0.0 s.d. 1.0 sesuai kartu kasus."""
+def _ambil_pwm(row: pd.Series) -> float:
+    """Mengembalikan target nilai PWM kipas dalam rentang 0.0 s.d. 255.0 sesuai kesepakatan tim."""
+    if "PWM_Kipas" in row and pd.notna(row["PWM_Kipas"]):
+        return float(row["PWM_Kipas"])
+    if "kipas" in row and pd.notna(row["kipas"]):
+        return float(row["kipas"])
     if "Duty_Rasio" in row and pd.notna(row["Duty_Rasio"]):
-        return float(row["Duty_Rasio"])
+        return float(row["Duty_Rasio"]) * 255.0
     if "Duty_Persen" in row and pd.notna(row["Duty_Persen"]):
         val = float(str(row["Duty_Persen"]).replace("%", "").strip())
-        return (val / 100.0) if val > 1.0 else val
-    pwm = row["PWM_Kipas"] if "PWM_Kipas" in row else row["kipas"]
-    return float(pwm) / 255.0
+        return (val / 100.0) * 255.0 if val <= 100.0 else val
+    raise ValueError(f"Tidak dapat menentukan nilai PWM dari baris: {dict(row)}")
 
 
 def _cari_folder_sesi(folder_sesi: str | Path | None) -> Path:
@@ -209,7 +212,7 @@ def muat(folder_sesi: str | Path | None = None):
 
         path_wav = _temukan_file_audio(folder_audio, row, kol_audio)
         fitur = _potong_log_mel(path_wav)
-        target = _duty_rasio(row)
+        target = _ambil_pwm(row)
 
         data[kunci]["X"].append(fitur)
         data[kunci]["y"].append(np.full(len(fitur), target, dtype=np.float32))
