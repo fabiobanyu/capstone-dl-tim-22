@@ -8,8 +8,7 @@ Digunakan untuk:
 
 Contoh pemakaian:
     python meja.py periksa
-    python meja.py --simulasi jalankan rencana/t22-kecepatan-kipas-suara.yaml
-    python meja.py --simulasi jalankan ../rencana/t22-kecepatan-kipas-suara.yaml --out data
+    python meja.py --simulasi jalankan rencana/t22-kecepatan-kipas-suara.yaml --out data
 """
 from __future__ import annotations
 
@@ -44,7 +43,6 @@ def _bangun_tabel_kondisi(rencana: dict, akar_proyek: Path) -> pd.DataFrame:
     """Membaca lembar sesi yang ada atau menyusun 270 kondisi secara deterministik."""
     csv_lembar = akar_proyek / "LEMBAR_SESI_TIM_22.csv"
     if not csv_lembar.is_file():
-        # Cari di folder induk jika dijalankan dari subfolder
         calon = list(akar_proyek.glob("**/LEMBAR_SESI_TIM_22.csv"))
         if calon:
             csv_lembar = calon[0]
@@ -53,6 +51,8 @@ def _bangun_tabel_kondisi(rencana: dict, akar_proyek: Path) -> pd.DataFrame:
         df = pd.read_csv(csv_lembar)
         if "file_audio" not in df.columns:
             df["file_audio"] = [f"audio/kondisi_{int(r['No']):03d}.wav" for _, r in df.iterrows()]
+        if "Duty_Rasio" not in df.columns:
+            df["Duty_Rasio"] = [round(float(r["PWM_Kipas"]) / 255.0, 6) for _, r in df.iterrows()]
         return df
 
     # Jika lembar sesi belum ada, buat permutasi berdasarkan seed di YAML
@@ -68,6 +68,7 @@ def _bangun_tabel_kondisi(rencana: dict, akar_proyek: Path) -> pd.DataFrame:
                 kombinasi.append({
                     "Ulangan": f"Rep {u}",
                     "PWM_Kipas": int(k),
+                    "Duty_Rasio": round(float(k) / 255.0, 6),
                     "Duty_Persen": f"{round((k / 255.0) * 100.0, 1)}%",
                     "Pompa_PWM": int(p),
                     "Status_Pompa": f"ON ({p})" if p > 0 else "OFF (0)",
@@ -87,7 +88,7 @@ def _bangun_tabel_kondisi(rencana: dict, akar_proyek: Path) -> pd.DataFrame:
         hasil.append(baris)
 
     df = pd.DataFrame(hasil)
-    cols = ["No", "Kondisi_ID", "Ulangan", "PWM_Kipas", "Duty_Persen", "Pompa_PWM", "Status_Pompa", "file_audio"]
+    cols = ["No", "Kondisi_ID", "Ulangan", "PWM_Kipas", "Duty_Rasio", "Duty_Persen", "Pompa_PWM", "Status_Pompa", "file_audio"]
     return df[cols]
 
 
@@ -114,7 +115,6 @@ def _sintesis_audio_kondisi(
     # 1. Komponen Suara Kipas (Blade Pass Frequency & Harmonik)
     if pwm_kipas > 0:
         duty_rasio = pwm_kipas / 255.0
-        # Frekuensi dasar bilah kipas: 60 Hz (idle) s.d. 380 Hz (maksimum)
         f0 = (60.0 + 320.0 * (duty_rasio ** 1.2))
         f_instan = f0 * profil_kecepatan
         fasa = 2.0 * np.pi * np.cumsum(f_instan) / sr
@@ -168,6 +168,7 @@ def _simulasikan_sesi(rencana: dict, out_dir: Path, akar_proyek: Path):
     t_mulai = time.time()
 
     data_sensor_daya = []
+    daftar_berkas_lengkap = ["label.csv", "daya.csv"]
 
     for idx, row in df_kondisi.iterrows():
         no = int(row["No"])
@@ -185,9 +186,9 @@ def _simulasikan_sesi(rencana: dict, out_dir: Path, akar_proyek: Path):
             seed_kondisi=1022 + no,
         )
         wavfile.write(target_wav, sr, audio_pcm)
+        daftar_berkas_lengkap.append(f"audio/{nama_wav}")
 
         # 2. Catat data sensor daya (arus naik bertahap sesuai PWM kipas)
-        # Karakteristik arus kipas: arus diam ~18 mA, naik hingga ~460 mA pada PWM 255
         arus_dasar_kipas = 18.0 + (440.0 * (pwm_kipas / 255.0) ** 1.1)
         arus_pompa = 220.0 if pwm_pompa > 0 else 0.0
 
@@ -219,7 +220,7 @@ def _simulasikan_sesi(rencana: dict, out_dir: Path, akar_proyek: Path):
     df_daya.to_csv(path_daya, index=False)
     print(f"[+] Berkas sensor daya tersimpan di: {path_daya}")
 
-    # 5. Tulis manifest.json sesi
+    # 5. Tulis manifest.json sesi meja uji
     path_manifest = out_dir / "manifest.json"
     manifest_sesi = {
         "sesi": "simulasi-t22-kecepatan-kipas-suara",
@@ -236,6 +237,19 @@ def _simulasikan_sesi(rencana: dict, out_dir: Path, akar_proyek: Path):
     }
     path_manifest.write_text(json.dumps(manifest_sesi, indent=2), encoding="utf-8")
     print(f"[+] Berkas manifest sesi tersimpan di: {path_manifest}")
+
+    # 6. Perbarui data/MANIFEST.json starter jika output disimpan di folder data proyek
+    folder_rel = out_dir.relative_to(akar_proyek) if out_dir.is_relative_to(akar_proyek) else None
+    if folder_rel and str(folder_rel) in ("data", "data/"):
+        manifest_starter_path = akar_proyek / "data" / "MANIFEST.json"
+        berkas_starter = [f"data/{b}" for b in sorted(daftar_berkas_lengkap)]
+        starter_data = {
+            "sumber": "Sesi simulasi meja uji t22-kecepatan-kipas-suara (persiapan Sprint 0)",
+            "berkas": berkas_starter,
+            "catatan": f"Sesi simulasi 270 kondisi (9 level PWM x 2 pompa x 15 ulangan), seed {rencana.get('seed', 1022)}",
+        }
+        manifest_starter_path.write_text(json.dumps(starter_data, indent=2), encoding="utf-8")
+        print(f"[+] data/MANIFEST.json starter diperbarui ({len(berkas_starter)} berkas terdaftar untuk data_hash).")
 
     durasi_total = time.time() - t_mulai
     print(f"\n[OK] Selesai: Seluruh {total_kondisi} kondisi berhasil disimulasikan dalam {durasi_total:.1f} detik.")
@@ -263,7 +277,6 @@ def main():
     if args.perintah == "jalankan":
         path_rencana = Path(args.rencana).resolve()
         if not path_rencana.is_file():
-            # Coba cari relatif terhadap folder repositori
             calon = Path(__file__).resolve().parent / args.rencana
             if calon.is_file():
                 path_rencana = calon
@@ -291,4 +304,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
