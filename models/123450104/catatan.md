@@ -2,7 +2,7 @@
 
 ## Status
 
-Kerangka CNN memakai label dan prediksi PWM 0–255 sesuai keputusan tim. Pemuat data di main masih menggunakan persen 0–100; PR Qois #15 mengusulkan skala 0–255 dan belum digabung. Jangan jalankan evaluasi bersama sebelum pemuat data dan protokol diselaraskan. Belum ada hasil data rekaman asli.
+Kerangka CNN memakai label dan prediksi PWM 0–255 sesuai rancangan tim. Pemuat data PR #15 sudah digabung dan menggunakan skala yang sama. CNN telah diuji dengan data simulasi; belum ada hasil data rekaman asli.
 
 ## Masukan dan Keluaran
 
@@ -22,6 +22,14 @@ Kerangka CNN memakai label dan prediksi PWM 0–255 sesuai keputusan tim. Pemuat
    - Linear(64 -> 1) + Sigmoid (rasio 0–1), dikalikan 255 saat prediksi
 3. **Optimizer**: Adam dengan learning rate 0.001 dan weight decay 0.0001 (L2 regularization).
 4. **Fungsi Rugi**: Mean Squared Error (MSE Loss), memakai target dibagi 255 selama pelatihan. Prediksi untuk evaluator dikembalikan ke 0–255. Metrik utama: MAE dalam % duty.
+
+## Hasil simulasi terbaru (seed 1)
+
+- Data: simulasi 270 kondisi dari `meja.py`, kode main `29f8fe3`, hash evaluator `a8922184f4e06b82ad3c1125e53e4506`.
+- Validasi: 342 segmen; data uji tidak digunakan. Durasi pelatihan dan pemuatan: 32,6 detik pada CPU.
+- CNN: MAE 6,681280 PWM = 2,6201% duty; RMSE 8,492593 PWM; R² 0,989391.
+- Baseline ridge, diuji ulang pada simulasi dan split yang sama: MAE 11,287073 PWM = 4,4263% duty. Baseline ini bukan pembanding MFCC + Random Forest/SVM yang diwajibkan.
+- Angka di atas hanya pengujian simulasi, belum membuktikan performa pada rekaman fisik.
 
 ## Catatan hasil simulasi sebelumnya (belum terverifikasi ulang)
 
