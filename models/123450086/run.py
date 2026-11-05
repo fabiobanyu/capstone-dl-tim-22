@@ -5,7 +5,6 @@
 
 Alur model:
     log-mel [N, 64, waktu]
-      -> normalisasi per pita (statistik dari data latih saja)
       -> potong menjadi patch (default 8 x 8), tiap patch diproyeksikan ke vektor d_model
       -> + token [CLS] + positional embedding (posisi frekuensi + posisi waktu)
       -> Transformer encoder (self-attention antar patch)
@@ -13,8 +12,10 @@ Alur model:
 
 Asumsi sementara (cek lagi setelah protokol tim dibekukan):
     - X berbentuk [N, 64, waktu] atau [N, 1, 64, waktu];
-    - y berupa duty (persen atau 0-255). Target distandarkan dari data latih,
-      lalu prediksi dikembalikan ke satuan semula, jadi satuan y tidak perlu diubah di sini.
+    - y berupa taraf PWM 0-255 sesuai PROTOKOL.md tim. Di dalam model target distandarkan
+      sementara (mean/std data latih) agar pelatihan stabil, lalu prediksi dikembalikan ke 0-255.
+    - Normalisasi fitur (z-score per pita dari data latih) sudah dilakukan di src/protokol/data.py,
+      jadi tidak diulang di sini.
 """
 from __future__ import annotations
 
@@ -112,11 +113,8 @@ def latih_dan_prediksi(seed: int, final: bool) -> tuple[np.ndarray, np.ndarray |
     if len(Xtr) == 0 or len(Xva) == 0 or len(ytr) != len(Xtr):
         raise ValueError("Data latih/validasi kosong atau jumlah label latih tidak cocok")
 
-    # Normalisasi fitur per pita mel, statistik dari data latih saja (aturan kartu kasus).
-    mean = Xtr.mean(axis=(0, 3), keepdims=True)
-    std = np.maximum(Xtr.std(axis=(0, 3), keepdims=True), 1e-6)
-    Xtr, Xva = (Xtr - mean) / std, (Xva - mean) / std
-    # Target distandarkan agar skala loss wajar (y bisa persen atau 0-255).
+    # Fitur sudah dinormalisasi oleh src/protokol/data.py (statistik data latih), tidak diulang.
+    # Target distandarkan sementara agar skala loss wajar; prediksi dikembalikan ke satuan label.
     y_mean, y_std = float(ytr.mean()), float(max(ytr.std(), 1e-6))
     y_min, y_max = float(ytr.min()), float(ytr.max())
     ytr_z = (ytr - y_mean) / y_std
@@ -155,7 +153,7 @@ def latih_dan_prediksi(seed: int, final: bool) -> tuple[np.ndarray, np.ndarray |
     if final:
         if Xte is None:
             raise ValueError("Data uji tidak tersedia untuk --final")
-        pred_test = prediksi((siapkan_fitur(Xte) - mean) / std)
+        pred_test = prediksi(siapkan_fitur(Xte))
     return pred_val, pred_test
 
 

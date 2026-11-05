@@ -8,7 +8,8 @@ Kerangka `run.py` (tugas #15) sudah ditulis. Menunggu data simulasi lewat `src/p
 ## Arsitektur awal
 
 - Masukan: log-mel 64 pita, 1 detik, bentuk `[N, 64, waktu]` atau `[N, 1, 64, waktu]`.
-- Normalisasi per pita mel; mean dan std dihitung dari data latih saja.
+- Normalisasi fitur (z-score per pita dari data latih) dilakukan di `src/protokol/data.py`, tidak diulang di `run.py`.
+- Label: taraf PWM 0-255 sesuai PROTOKOL.md tim.
 - Patch 8 x 8 (pita x frame) -> patch embedding (Conv2d kernel = stride = ukuran patch) ke d_model 64.
 - Token [CLS] + positional embedding terpisah untuk sumbu frekuensi dan waktu.
 - Transformer encoder 2 lapis, 4 head, feed-forward 128, dropout 0.1, pre-norm.
