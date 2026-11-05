@@ -2,12 +2,12 @@
 
 ## Status
 
-Kerangka CNN menggunakan target rasio 0–1 sesuai kartu kasus. Pemuat data tim di main masih menggunakan persen 0–100, sehingga belum kompatibel dan perlu diselaraskan oleh tim sebelum pengujian bersama. Belum ada hasil data rekaman asli.
+Kerangka CNN memakai label dan prediksi PWM 0–255 sesuai keputusan tim. Pemuat data di main masih menggunakan persen 0–100; PR Qois #15 mengusulkan skala 0–255 dan belum digabung. Jangan jalankan evaluasi bersama sebelum pemuat data dan protokol diselaraskan. Belum ada hasil data rekaman asli.
 
 ## Masukan dan Keluaran
 
 - **Masukan**: Log-mel 64 pita, 1 detik (bentuk `[N, 1, 64, waktu]`, `waktu >= 4`).
-- **Keluaran**: Rasio duty kontinu 0–1. MAE pada skala ini dikalikan 100 untuk dilaporkan dalam persen duty.
+- **Keluaran**: PWM kontinu 0–255. MAE dalam skala ini dikalikan 100/255 untuk dilaporkan dalam persen duty.
 - **Normalisasi**: Dilakukan sekali oleh pemuat data tim berdasarkan statistik data latih; CNN tidak mengulang normalisasi.
 
 ## Arsitektur & Keputusan Desain
@@ -19,9 +19,9 @@ Kerangka CNN menggunakan target rasio 0–1 sesuai kartu kasus. Pemuat data tim 
    - AdaptiveAvgPool2d((1, 1))
 2. **Regressor Head**:
    - Flatten + Dropout(p=0.2)
-   - Linear(64 -> 1) + Sigmoid (rasio 0–1)
+   - Linear(64 -> 1) + Sigmoid (rasio 0–1), dikalikan 255 saat prediksi
 3. **Optimizer**: Adam dengan learning rate 0.001 dan weight decay 0.0001 (L2 regularization).
-4. **Fungsi Rugi**: Mean Squared Error (MSE Loss) untuk pelatihan regresi kontinu. Metrik evaluasi utama: Mean Absolute Error (MAE dalam % duty).
+4. **Fungsi Rugi**: Mean Squared Error (MSE Loss), memakai target dibagi 255 selama pelatihan. Prediksi untuk evaluator dikembalikan ke 0–255. Metrik utama: MAE dalam % duty.
 
 ## Catatan hasil simulasi sebelumnya (belum terverifikasi ulang)
 
@@ -34,7 +34,7 @@ Catatan versi sebelumnya mencantumkan data simulasi 270 kondisi. File metrik dan
   - RMSE: **3.2796%** duty
 - **Keluaran**: Valid 1D array (`shape = (513,)`) tanpa nilai NaN/Inf.
 
-Evaluator starter menulis `val_mae` dalam satuan yang sama dengan label (rasio 0–1). Untuk MAE persen duty, kalikan `val_mae` dengan 100; jangan menyunting `metrics.json` secara manual.
+Evaluator starter menulis `val_mae` dalam satuan yang sama dengan label (PWM 0–255). Untuk MAE persen duty, kalikan `val_mae` dengan 100/255; jangan menyunting `metrics.json` secara manual.
 
 ## Rencana Lanjutan (Sprint 1)
 

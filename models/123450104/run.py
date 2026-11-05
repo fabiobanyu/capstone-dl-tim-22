@@ -4,7 +4,7 @@
     python models/123450104/run.py --seed 1 --final  # uji hanya pada sprint terakhir
 
 Asumsi sementara: X berbentuk [N, 64, waktu] atau [N, 1, 64, waktu],
-dan y berisi rasio duty (0–1). Pemuat data tim harus memakai skala yang sama.
+dan y berisi nilai PWM (0–255). Pemuat data tim harus memakai skala yang sama.
 """
 from __future__ import annotations
 
@@ -60,8 +60,8 @@ def latih_dan_prediksi(seed: int, final: bool):
     ytr = np.asarray(ytr, dtype=np.float32).reshape(-1)
     if len(Xtr) == 0 or len(Xva) == 0 or len(ytr) != len(Xtr):
         raise ValueError("Data latih/validasi kosong atau jumlah label latih tidak cocok")
-    if not np.isfinite(ytr).all() or np.any((ytr < 0) | (ytr > 1)):
-        raise ValueError("Label latih harus berupa rasio duty 0–1; sesuaikan pemuat data tim")
+    if not np.isfinite(ytr).all() or np.any((ytr < 0) | (ytr > 255)):
+        raise ValueError("Label latih harus berupa PWM dalam rentang 0–255")
     # Pemuat data tim menormalisasi fitur menggunakan statistik data latih.
     dataset = TensorDataset(torch.from_numpy(Xtr), torch.from_numpy(ytr))
     batches = DataLoader(dataset, batch_size=32, shuffle=True)
@@ -71,7 +71,8 @@ def latih_dan_prediksi(seed: int, final: bool):
         model.train()
         for x, y in batches:
             optimizer.zero_grad()
-            loss = nn.functional.mse_loss(model(x), y)
+            # Latih pada rasio 0–1 untuk stabilitas; keluaran publik tetap PWM 0–255.
+            loss = nn.functional.mse_loss(model(x), y / 255.0)
             loss.backward()
             optimizer.step()
 
@@ -79,7 +80,7 @@ def latih_dan_prediksi(seed: int, final: bool):
         model.eval()
         loader = DataLoader(torch.from_numpy(X), batch_size=32)
         with torch.no_grad():
-            return np.concatenate([model(x).numpy() for x in loader]).astype(np.float32)
+            return (255.0 * np.concatenate([model(x).numpy() for x in loader])).astype(np.float32)
 
     val = prediksi(Xva)
     if final:
