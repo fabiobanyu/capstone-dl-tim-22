@@ -16,6 +16,9 @@ import time
 from pathlib import Path
 
 import numpy as np
+import torch
+from torch import nn
+from torch.utils.data import DataLoader, TensorDataset
 
 AKAR = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(AKAR))
@@ -27,10 +30,6 @@ JALUR = "tl"                                   # Transfer learning
 
 def latih_dan_prediksi(seed: int, final: bool) -> tuple[np.ndarray, np.ndarray | None]:
     """Kembalikan (pred_val, pred_test|None) dalam rentang target PWM 0.0 s.d. 255.0."""
-    import torch
-    from torch import nn
-    from torch.utils.data import DataLoader, TensorDataset
-
     torch.manual_seed(seed)
     np.random.seed(seed)
     Xtr, ytr, Xva, _, Xte, _ = data.muat()
