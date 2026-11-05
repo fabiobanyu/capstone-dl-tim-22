@@ -63,7 +63,7 @@ def _potong_log_mel(path_wav: Path) -> np.ndarray:
     if sr_asli != SR:
         y = resample_poly(y, SR, sr_asli).astype(np.float32)
 
-    y = y[SR:]  # buang 1 detik pertama setiap kondisi
+    y = y[SR:]  # buang 1 detik pertama setiap kondisi (fase transien akselerasi)
     n_segmen = len(y) // SR
 
     segmen = []
@@ -85,11 +85,18 @@ def _nomor_ulangan(val) -> int:
     return int(str(val).lower().replace("rep", "").strip())
 
 
-def _duty_persen(row: pd.Series) -> float:
+def _ambil_pwm(row: pd.Series) -> float:
+    """Mengembalikan target nilai PWM kipas dalam rentang 0.0 s.d. 255.0 sesuai kesepakatan tim."""
+    if "PWM_Kipas" in row and pd.notna(row["PWM_Kipas"]):
+        return float(row["PWM_Kipas"])
+    if "kipas" in row and pd.notna(row["kipas"]):
+        return float(row["kipas"])
+    if "Duty_Rasio" in row and pd.notna(row["Duty_Rasio"]):
+        return float(row["Duty_Rasio"]) * 255.0
     if "Duty_Persen" in row and pd.notna(row["Duty_Persen"]):
-        return float(str(row["Duty_Persen"]).replace("%", "").strip())
-    pwm = row["PWM_Kipas"] if "PWM_Kipas" in row else row["kipas"]
-    return (float(pwm) / 255.0) * 100.0
+        val = float(str(row["Duty_Persen"]).replace("%", "").strip())
+        return (val / 100.0) * 255.0 if val <= 100.0 else val
+    raise ValueError(f"Tidak dapat menentukan nilai PWM dari baris: {dict(row)}")
 
 
 def _cari_folder_sesi(folder_sesi: str | Path | None) -> Path:
@@ -125,6 +132,47 @@ def _cari_csv_metadata(folder: Path) -> Path:
     return calon[0]
 
 
+def _temukan_file_audio(folder_audio: Path, row: pd.Series, kol_audio: str | None) -> Path:
+    """Mencocokkan berkas audio secara deterministik lewat metadata (bukan sekadar urutan)."""
+    # 1. Jalur langsung dari kolom audio di metadata
+    if kol_audio is not None and pd.notna(row[kol_audio]):
+        p = Path(str(row[kol_audio]))
+        if p.is_file():
+            return p
+        if (folder_audio / p.name).is_file():
+            return folder_audio / p.name
+
+    # 2. Cocokkan berdasarkan kolom No (misal No: 1 -> kondisi_001.wav, audio_001.wav, dll)
+    if "No" in row and pd.notna(row["No"]):
+        try:
+            no = int(row["No"])
+            pola_list = (
+                f"kondisi_{no:03d}.wav",
+                f"audio_{no:03d}.wav",
+                f"*{no:03d}*.wav",
+                f"kondisi_{no}.wav",
+                f"{no}.wav",
+            )
+            for pola in pola_list:
+                temu = sorted(folder_audio.glob(pola))
+                if temu:
+                    return temu[0]
+        except Exception:
+            pass
+
+    # 3. Cocokkan berdasarkan Kondisi_ID (misal "[001/270]" -> "001")
+    if "Kondisi_ID" in row and pd.notna(row["Kondisi_ID"]):
+        kid = str(row["Kondisi_ID"]).strip("[]").split("/")[0].strip()
+        temu = sorted(folder_audio.glob(f"*{kid}*.wav"))
+        if temu:
+            return temu[0]
+
+    raise FileNotFoundError(
+        f"Berkas audio tidak ditemukan untuk kondisi (No={row.get('No', '?')}, "
+        f"Kondisi_ID={row.get('Kondisi_ID', '?')}) di dalam {folder_audio}."
+    )
+
+
 def muat(folder_sesi: str | Path | None = None):
     """Memuat dataset suara kipas Tim 22 sesuai protokol pembagian per ulangan."""
     folder = _cari_folder_sesi(folder_sesi)
@@ -137,9 +185,8 @@ def muat(folder_sesi: str | Path | None = None):
 
     kol_audio = next((c for c in ("file_audio", "audio", "file", "path") if c in df.columns), None)
     folder_audio = folder / "audio"
-    daftar_wav = sorted(folder_audio.glob("*.wav")) if folder_audio.is_dir() else []
 
-    if kol_audio is None and not daftar_wav:
+    if not folder_audio.is_dir() or not any(folder_audio.glob("*.wav")):
         raise FileNotFoundError(
             f"Tidak ditemukan berkas audio .wav di {folder_audio}. "
             "Pastikan folder sesi memuat subfolder 'audio/' berisi rekaman .wav "
@@ -154,7 +201,7 @@ def muat(folder_sesi: str | Path | None = None):
 
     data = {k: {"X": [], "y": [], "u": set()} for k in ("latih", "val", "uji")}
 
-    for i, (_, row) in enumerate(df.iterrows()):
+    for _, row in df.iterrows():
         u = _nomor_ulangan(row[kol_ulangan])
         if u in ulangan_latih:
             kunci = "latih"
@@ -163,22 +210,9 @@ def muat(folder_sesi: str | Path | None = None):
         else:
             kunci = "uji"
 
-        if kol_audio is not None:
-            path_wav = Path(str(row[kol_audio]))
-            if not path_wav.is_file():
-                path_wav = folder_audio / path_wav.name
-        else:
-            if i >= len(daftar_wav):
-                raise IndexError(
-                    f"Jumlah baris metadata ({len(df)}) melebihi jumlah berkas audio ({len(daftar_wav)})."
-                )
-            path_wav = daftar_wav[i]
-
-        if not path_wav.is_file():
-            raise FileNotFoundError(f"Berkas audio tidak ditemukan: {path_wav}")
-
+        path_wav = _temukan_file_audio(folder_audio, row, kol_audio)
         fitur = _potong_log_mel(path_wav)
-        target = _duty_persen(row)
+        target = _ambil_pwm(row)
 
         data[kunci]["X"].append(fitur)
         data[kunci]["y"].append(np.full(len(fitur), target, dtype=np.float32))
