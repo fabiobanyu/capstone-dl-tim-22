@@ -1,4 +1,8 @@
-"""Model Transfer Learning (TL) untuk estimasi nilai PWM kipas (regresi).
+"""Kerangka awal regresi untuk jalur Transfer Learning (TL) estimasi nilai PWM kipas.
+
+Catatan: Berkas ini masih menggunakan jaringan regresi sederhana untuk memverifikasi
+alur pemuat data dan evaluator pada skala PWM 0-255. Model pralatih (pretrained backbone)
+untuk jalur transfer learning akan dipasang pada tahap pemodelan berikutnya.
 
     python models/123450067/run.py --seed 1
     python models/123450067/run.py --seed 1 --final  # sprint terakhir

@@ -169,6 +169,7 @@ def _simulasikan_sesi(rencana: dict, out_dir: Path, akar_proyek: Path):
 
     data_sensor_daya = []
     daftar_berkas_lengkap = ["label.csv", "daya.csv"]
+    rng_daya = np.random.default_rng(rencana.get("seed", 1022))
 
     for idx, row in df_kondisi.iterrows():
         no = int(row["No"])
@@ -193,7 +194,7 @@ def _simulasikan_sesi(rencana: dict, out_dir: Path, akar_proyek: Path):
         arus_pompa = 220.0 if pwm_pompa > 0 else 0.0
 
         for detik in range(1, durasi_detik + 1):
-            jitter = np.random.normal(0, 1.5)
+            jitter = rng_daya.normal(0, 1.5)
             arus_total = arus_dasar_kipas + arus_pompa + jitter
             data_sensor_daya.append({
                 "timestamp_detik": (no - 1) * durasi_detik + detik,
@@ -201,7 +202,7 @@ def _simulasikan_sesi(rencana: dict, out_dir: Path, akar_proyek: Path):
                 "kondisi_id": row["Kondisi_ID"],
                 "pwm_kipas": pwm_kipas,
                 "pwm_pompa": pwm_pompa,
-                "tegangan_V": round(5.0 + np.random.normal(0, 0.02), 3),
+                "tegangan_V": round(5.0 + rng_daya.normal(0, 0.02), 3),
                 "arus_kipas_mA": round(max(0.0, arus_dasar_kipas + jitter), 2),
                 "arus_total_mA": round(max(0.0, arus_total), 2),
             })
