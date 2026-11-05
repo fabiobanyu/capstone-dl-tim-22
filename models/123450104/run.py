@@ -4,7 +4,7 @@
     python models/123450104/run.py --seed 1 --final  # uji hanya pada sprint terakhir
 
 Asumsi sementara: X berbentuk [N, 64, waktu] atau [N, 1, 64, waktu],
-dan y berisi duty dalam persen (0–100). Pastikan sesuai protokol yang disetujui.
+dan y berisi rasio duty (0–1). Pemuat data tim harus memakai skala yang sama.
 """
 from __future__ import annotations
 
@@ -34,7 +34,7 @@ class CNNRegresi(nn.Module):
             nn.Conv2d(16, 32, 3, padding=1), nn.ReLU(), nn.MaxPool2d(2),
             nn.Conv2d(32, 64, 3, padding=1), nn.ReLU(),
             nn.AdaptiveAvgPool2d((1, 1)), nn.Flatten(), nn.Dropout(0.2),
-            nn.Linear(64, 1),
+            nn.Linear(64, 1), nn.Sigmoid(),
         )
 
     def forward(self, x):
@@ -60,13 +60,9 @@ def latih_dan_prediksi(seed: int, final: bool):
     ytr = np.asarray(ytr, dtype=np.float32).reshape(-1)
     if len(Xtr) == 0 or len(Xva) == 0 or len(ytr) != len(Xtr):
         raise ValueError("Data latih/validasi kosong atau jumlah label latih tidak cocok")
-    if not np.isfinite(ytr).all() or np.any((ytr < 0) | (ytr > 100)):
-        raise ValueError("Label latih harus berupa duty persen dalam rentang 0–100")
-    # Statistik per pita dihitung dari latih saja; sesuaikan jika protokol sudah menormalisasi X.
-    mean = Xtr.mean(axis=(0, 3), keepdims=True)
-    std = Xtr.std(axis=(0, 3), keepdims=True)
-    std = np.maximum(std, 1e-6)
-    Xtr, Xva = (Xtr - mean) / std, (Xva - mean) / std
+    if not np.isfinite(ytr).all() or np.any((ytr < 0) | (ytr > 1)):
+        raise ValueError("Label latih harus berupa rasio duty 0–1; sesuaikan pemuat data tim")
+    # Pemuat data tim menormalisasi fitur menggunakan statistik data latih.
     dataset = TensorDataset(torch.from_numpy(Xtr), torch.from_numpy(ytr))
     batches = DataLoader(dataset, batch_size=32, shuffle=True)
     model = CNNRegresi()
@@ -92,7 +88,7 @@ def latih_dan_prediksi(seed: int, final: bool):
         Xte = siapkan_fitur(Xte)
         if len(Xte) == 0:
             raise ValueError("Data uji kosong")
-        return val, prediksi((Xte - mean) / std)
+        return val, prediksi(Xte)
     return val, None
 
 

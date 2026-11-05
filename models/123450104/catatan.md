@@ -2,13 +2,13 @@
 
 ## Status
 
-Kerangka model `run.py` telah selesai diimplementasikan dan diverifikasi berjalan sukses pada data simulasi 1-detik log-mel (5.130 sampel). Saat ini menunggu data rekaman primer meja uji (jadwal 5-7 Nov) dan implementasi data loader tim oleh Penjaga Data.
+Kerangka CNN menggunakan target rasio 0–1 sesuai kartu kasus. Pemuat data tim di main masih menggunakan persen 0–100, sehingga belum kompatibel dan perlu diselaraskan oleh tim sebelum pengujian bersama. Belum ada hasil data rekaman asli.
 
 ## Masukan dan Keluaran
 
 - **Masukan**: Log-mel 64 pita, 1 detik (bentuk `[N, 1, 64, waktu]`, `waktu >= 4`).
-- **Keluaran**: Nilai kontinu duty PWM dalam rentang persen (0–100%).
-- **Normalisasi**: Per-pita (mean dan std dihitung khusus dari subset data latih untuk mencegah data leakage).
+- **Keluaran**: Rasio duty kontinu 0–1. MAE pada skala ini dikalikan 100 untuk dilaporkan dalam persen duty.
+- **Normalisasi**: Dilakukan sekali oleh pemuat data tim berdasarkan statistik data latih; CNN tidak mengulang normalisasi.
 
 ## Arsitektur & Keputusan Desain
 
@@ -19,13 +19,13 @@ Kerangka model `run.py` telah selesai diimplementasikan dan diverifikasi berjala
    - AdaptiveAvgPool2d((1, 1))
 2. **Regressor Head**:
    - Flatten + Dropout(p=0.2)
-   - Linear(64 -> 1)
+   - Linear(64 -> 1) + Sigmoid (rasio 0–1)
 3. **Optimizer**: Adam dengan learning rate 0.001 dan weight decay 0.0001 (L2 regularization).
 4. **Fungsi Rugi**: Mean Squared Error (MSE Loss) untuk pelatihan regresi kontinu. Metrik evaluasi utama: Mean Absolute Error (MAE dalam % duty).
 
-## Hasil Pengujian pada Data Simulasi (Seed 1)
+## Catatan hasil simulasi sebelumnya (belum terverifikasi ulang)
 
-Verifikasi end-to-end dilakukan menggunakan generator data simulasi 270 kondisi (9 level PWM x 2 level pompa x 15 ulangan):
+Catatan versi sebelumnya mencantumkan data simulasi 270 kondisi. File metrik dan data yang mendasari angka ini belum tersedia untuk diperiksa di laptop ini; hasil berikut bukan hasil model yang baru disesuaikan:
 - **Jumlah sampel**: 5.130 jendela (latih: 4.617, validasi: 513)
 - **Epoch**: 10
 - **Durasi komputasi**: 20.5 detik (CPU laptop)
@@ -33,6 +33,8 @@ Verifikasi end-to-end dilakukan menggunakan generator data simulasi 270 kondisi 
   - MAE: **2.8642%** duty
   - RMSE: **3.2796%** duty
 - **Keluaran**: Valid 1D array (`shape = (513,)`) tanpa nilai NaN/Inf.
+
+Evaluator starter menulis `val_mae` dalam satuan yang sama dengan label (rasio 0–1). Untuk MAE persen duty, kalikan `val_mae` dengan 100; jangan menyunting `metrics.json` secara manual.
 
 ## Rencana Lanjutan (Sprint 1)
 
