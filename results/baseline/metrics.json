@@ -1,0 +1,14 @@
+{
+  "metrik": {
+    "val_rmse": 14.365857,
+    "val_mae": 11.287118,
+    "val_r2": 0.969643
+  },
+  "seed": 2026,
+  "data_hash": "a8922184f4e06b82ad3c1125e53e4506",
+  "perangkat": "cpu laptop",
+  "model": "baseline",
+  "n_val": 342,
+  "n_test": 0,
+  "durasi_detik": 3.8
+}
