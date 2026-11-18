@@ -16,6 +16,9 @@ Contoh lengkap: ``contoh_fashion_mnist.py`` di folder ini.
 """
 from __future__ import annotations
 
+from bisect import bisect_right
+from functools import lru_cache
+from math import gcd
 from pathlib import Path
 import numpy as np
 import pandas as pd
@@ -63,7 +66,10 @@ def _potong_log_mel(path_wav: Path) -> np.ndarray:
     if sr_asli != SR:
         y = resample_poly(y, SR, sr_asli).astype(np.float32)
 
-    y = y[SR:]  # buang 1 detik pertama setiap kondisi (fase transien akselerasi)
+    return _log_mel(y[SR:])  # buang 1 detik pertama setiap kondisi
+
+
+def _log_mel(y: np.ndarray) -> np.ndarray:
     n_segmen = len(y) // SR
 
     segmen = []
@@ -79,6 +85,65 @@ def _potong_log_mel(path_wav: Path) -> np.ndarray:
         log_mel -= log_mel.max()
         segmen.append(log_mel.astype(np.float32))
     return np.stack(segmen)
+
+
+def _potong_sesi_berindeks(folder: Path, label: pd.DataFrame):
+    """Potong kondisi berdasarkan jam host, termasuk yang melintasi dua WAV."""
+    index = pd.read_csv(folder / "audio_index.csv").sort_values("t_mulai_host")
+    chunks = list(index.itertuples(index=False))
+    awal = index["t_mulai_host"].tolist()
+    if not chunks or any(y <= x for x, y in zip(awal, awal[1:])):
+        raise ValueError("Awal rekaman pada audio_index.csv harus unik dan terurut")
+    laju = int(chunks[0].sample_rate)
+    if laju <= 0 or any(c.sample_rate != laju or c.jumlah_sampel <= 0 for c in chunks):
+        raise ValueError("Laju sampel dan panjang audio_index.csv tidak valid")
+    pembagi = gcd(laju, SR)
+
+    @lru_cache(maxsize=2)
+    def baca_wav(nama):
+        laju_wav, pcm = wavfile.read(folder / "audio" / nama)
+        if laju_wav != laju:
+            raise ValueError(f"Laju sampel WAV {nama} berbeda dari audio_index.csv")
+        if np.issubdtype(pcm.dtype, np.unsignedinteger):
+            titik_tengah = (np.iinfo(pcm.dtype).max + 1) / 2
+            suara = (pcm.astype(np.float32) - titik_tengah) / titik_tengah
+        elif np.issubdtype(pcm.dtype, np.signedinteger):
+            suara = pcm.astype(np.float32) / -np.iinfo(pcm.dtype).min
+        else:
+            suara = pcm.astype(np.float32)
+        return suara.mean(axis=1) if suara.ndim == 2 else suara
+
+    for row in label.itertuples(index=False):
+        t0 = row.t_mulai_host + 1.0
+        detik = int(np.floor(row.t_selesai_host - row.t_mulai_host)) - 1
+        if detik < 1:
+            raise ValueError(f"Kondisi pada {row.t_mulai_host} terlalu pendek")
+        suara = np.zeros(detik * laju, dtype=np.float32)
+        terisi = 0
+        hilang = 0
+        pertama = max(0, bisect_right(awal, t0) - 1)
+        for c in chunks[pertama:]:
+            offset = round((c.t_mulai_host - t0) * laju)
+            if offset >= len(suara):
+                break
+            kiri = max(terisi, offset)
+            kanan = min(len(suara), offset + c.jumlah_sampel)
+            if kanan <= kiri:
+                continue
+            pcm = baca_wav(c.berkas)
+            if len(pcm) != c.jumlah_sampel:
+                raise ValueError(f"Panjang WAV {c.berkas} berbeda dari audio_index.csv")
+            hilang += kiri - terisi
+            suara[kiri:kanan] = pcm[kiri - offset : kanan - offset]
+            terisi = kanan
+            if terisi == len(suara):
+                break
+        # Celah kecil antar-WAV dibiarkan nol untuk mempertahankan waktu label.
+        if hilang + len(suara) - terisi > round(0.005 * laju):
+            raise ValueError(f"Rekaman tidak menutupi kondisi pada {row.t_mulai_host}")
+        if laju != SR:
+            suara = resample_poly(suara, SR // pembagi, laju // pembagi)
+        yield _log_mel(suara)
 
 
 def _nomor_ulangan(val) -> int:
@@ -103,6 +168,10 @@ def _cari_folder_sesi(folder_sesi: str | Path | None) -> Path:
     if folder_sesi is not None:
         return Path(folder_sesi)
     akar_data = manifest.AKAR / "data"
+    if manifest.MANIFEST.is_file():
+        konfigurasi = manifest.baca()
+        if "folder_sesi" in konfigurasi:
+            return manifest.AKAR / konfigurasi["folder_sesi"]
     if (akar_data / "audio").is_dir():
         return akar_data
     for sub in sorted(akar_data.iterdir()):
@@ -201,6 +270,8 @@ def muat(folder_sesi: str | Path | None = None):
 
     data = {k: {"X": [], "y": [], "u": set()} for k in ("latih", "val", "uji")}
 
+    audio_berindeks = (folder / "audio_index.csv").is_file()
+    potongan = _potong_sesi_berindeks(folder, df) if audio_berindeks else None
     for _, row in df.iterrows():
         u = _nomor_ulangan(row[kol_ulangan])
         if u in ulangan_latih:
@@ -210,8 +281,10 @@ def muat(folder_sesi: str | Path | None = None):
         else:
             kunci = "uji"
 
-        path_wav = _temukan_file_audio(folder_audio, row, kol_audio)
-        fitur = _potong_log_mel(path_wav)
+        if potongan is not None:
+            fitur = next(potongan)
+        else:
+            fitur = _potong_log_mel(_temukan_file_audio(folder_audio, row, kol_audio))
         target = _ambil_pwm(row)
 
         data[kunci]["X"].append(fitur)

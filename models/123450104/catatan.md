@@ -2,7 +2,7 @@
 
 ## Status
 
-Kerangka CNN memakai label dan prediksi PWM 0–255 sesuai rancangan tim. Pemuat data PR #15 sudah digabung dan menggunakan skala yang sama. CNN telah diuji dengan data simulasi; belum ada hasil data rekaman asli.
+CNN memakai label dan prediksi PWM 0–255 sesuai rancangan tim. Kerangka sudah diuji pada simulasi, dan CNN telah dilatih pada rekaman asli untuk tugas #12 Sprint 1.
 
 ## Masukan dan Keluaran
 
@@ -23,6 +23,13 @@ Kerangka CNN memakai label dan prediksi PWM 0–255 sesuai rancangan tim. Pemuat
 3. **Optimizer**: Adam dengan learning rate 0.001 dan weight decay 0.0001 (L2 regularization).
 4. **Fungsi Rugi**: Mean Squared Error (MSE Loss), memakai target dibagi 255 selama pelatihan. Prediksi untuk evaluator dikembalikan ke 0–255. Metrik utama: MAE dalam % duty.
 
+## Hasil rekaman asli (seed 1)
+
+- Sesi `sesi-20261117-220432`, 270 kondisi, dengan 3.762 segmen latih dan 342 segmen validasi. Sebanyak 1.026 segmen dikunci untuk uji akhir.
+- MAE validasi 20,805053 PWM atau **8,16% duty**. RMSE 27,615500 PWM dan R² 0,887823.
+- Hash evaluator `ffe4f590d99606e2090c18b099866cb0`. Pelatihan dan pemuatan data memakan 36,4 detik pada CPU laptop.
+- Reproduksi dari akar repo setelah mengekstrak ZIP sesi ke lokasi pada protokol: `python models/123450104/run.py --seed 1`.
+
 ## Hasil simulasi terbaru (seed 1)
 
 - Data: simulasi 270 kondisi dari `meja.py`, kode main `29f8fe3`, hash evaluator `a8922184f4e06b82ad3c1125e53e4506`.
@@ -30,6 +37,7 @@ Kerangka CNN memakai label dan prediksi PWM 0–255 sesuai rancangan tim. Pemuat
 - CNN: MAE 6,681280 PWM = 2,6201% duty; RMSE 8,492593 PWM; R² 0,989391.
 - Baseline ridge, diuji ulang pada simulasi dan split yang sama: MAE 11,287073 PWM = 4,4263% duty. Baseline ini bukan pembanding MFCC + Random Forest/SVM yang diwajibkan.
 - Angka di atas hanya pengujian simulasi, belum membuktikan performa pada rekaman fisik.
+- Artefak seed 1 simulasi tersimpan di `results/123450104/simulasi/`.
 
 ## Catatan hasil simulasi sebelumnya (belum terverifikasi ulang)
 
@@ -47,6 +55,5 @@ Evaluator starter menulis `val_mae` dalam satuan yang sama dengan label (PWM 0�
 ## Rencana Lanjutan (Sprint 1)
 
 1. Menguji variasi arsitektur (Ablation 1: tanpa Dropout, Ablation 2: penambahan filter / layer konvolusi).
-2. Melatih pada data primer rekaman meja setelah data tersedia dari sesi 5 Nov.
-3. Menjalankan 3 seed (seed 1, 2, 3) dan mencatat tabel komparasi serta variansi MAE.
-4. Mengekspor model ke format ONNX dan mengukur ukuran model (KB) serta latensi inferensi (ms).
+2. Menjalankan 3 seed (seed 1, 2, 3) dan mencatat tabel komparasi serta variansi MAE.
+3. Mengekspor model ke format ONNX dan mengukur ukuran model (KB) serta latensi inferensi (ms).
