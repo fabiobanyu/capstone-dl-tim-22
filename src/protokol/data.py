@@ -161,6 +161,19 @@ def _ambil_pwm(row: pd.Series) -> float:
 def _cari_folder_sesi(folder_sesi: str | Path | None) -> Path:
     if folder_sesi is not None:
         return Path(folder_sesi)
+
+    # Pemuat dan evaluator harus memakai sesi yang sama, walau simulasi masih tersimpan.
+    if manifest.MANIFEST.is_file():
+        label_sesi = [Path(nama) for nama in manifest.baca()["berkas"]
+                      if Path(nama).name == "label.csv"]
+        if len(label_sesi) > 1:
+            raise ValueError("MANIFEST.json harus menunjuk ke satu label.csv untuk sesi aktif")
+        if label_sesi:
+            label = manifest.AKAR / label_sesi[0]
+            if not label.is_file():
+                raise FileNotFoundError(f"Label sesi pada MANIFEST.json tidak ditemukan: {label}")
+            return label.parent
+
     akar_data = manifest.AKAR / "data"
     if (akar_data / "audio").is_dir():
         return akar_data
