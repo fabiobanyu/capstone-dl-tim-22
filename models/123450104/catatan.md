@@ -25,9 +25,9 @@ CNN memakai label dan prediksi PWM 0–255 sesuai rancangan tim. Kerangka sudah 
 
 ## Hasil rekaman asli (seed 1)
 
-- Sesi `sesi-20261117-220432`, 270 kondisi, dengan 3.762 segmen latih dan 342 segmen validasi. Sebanyak 1.026 segmen dikunci untuk uji akhir.
-- MAE validasi 20,805053 PWM atau **8,16% duty**. RMSE 27,615500 PWM dan R² 0,887823.
-- Hash evaluator `ffe4f590d99606e2090c18b099866cb0`. Pelatihan dan pemuatan data memakan 36,4 detik pada CPU laptop.
+- Sesi `sesi-20261117-220432` memakai manifest dan pemotongan audio dari PR #24. Ada 270 kondisi dengan 3.711 segmen latih dan 338 segmen validasi. Sebanyak 1.018 segmen dikunci untuk uji akhir.
+- MAE validasi 20,036744 PWM atau **7,86% duty**. RMSE 27,159688 PWM dan R² 0,891384.
+- Hash evaluator `c70ef6fa3c33a2da1ff7d7050f56af9b`, sama dengan baseline tim di PR #24. Pelatihan dan pemuatan data memakan 34,9 detik pada CPU laptop.
 - Reproduksi dari akar repo setelah mengekstrak ZIP sesi ke lokasi pada protokol: `python models/123450104/run.py --seed 1`.
 
 ## Hasil simulasi terbaru (seed 1)

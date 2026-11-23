@@ -1,7 +1,7 @@
 {
-  "sumber": "Rekaman asli Tim 22, sesi-20261117-220432.zip (Google Drive tim)",
-  "folder_sesi": "data/sesi-20261117-220432",
+  "sumber": "Rekaman primer meja uji Ruang Cerdas 5 V ITERA (sesi-20261117-220432, arsip tim22_sesi-20261117-220432.tar; salinan tim di Google Drive)",
   "berkas": [
+    "data/sesi-20261117-220432/aktuator.csv",
     "data/sesi-20261117-220432/audio/audio-0001.wav",
     "data/sesi-20261117-220432/audio/audio-0002.wav",
     "data/sesi-20261117-220432/audio/audio-0003.wav",
@@ -103,7 +103,14 @@
     "data/sesi-20261117-220432/audio/audio-0099.wav",
     "data/sesi-20261117-220432/audio/audio-0100.wav",
     "data/sesi-20261117-220432/audio_index.csv",
-    "data/sesi-20261117-220432/label.csv"
+    "data/sesi-20261117-220432/daya.csv",
+    "data/sesi-20261117-220432/digital.csv",
+    "data/sesi-20261117-220432/imu.csv",
+    "data/sesi-20261117-220432/label.csv",
+    "data/sesi-20261117-220432/lingkungan.csv",
+    "data/sesi-20261117-220432/log.txt",
+    "data/sesi-20261117-220432/manifest.json",
+    "data/sesi-20261117-220432/rencana.yaml"
   ],
-  "catatan": "100 WAV dan dua CSV yang digunakan pemuat data. SHA-256 seluruh masukan diverifikasi terhadap manifest.json dari perekam."
+  "catatan": "Sesi primer 17 Nov 2026: 270 kondisi lengkap (9 PWM x 2 pompa x 15 ulangan), 100 berkas audio kontinu 48 kHz + sensor daya, imu, aktuator, lingkungan."
 }
