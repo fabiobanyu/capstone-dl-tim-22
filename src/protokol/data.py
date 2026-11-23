@@ -53,18 +53,26 @@ def _filterbank_mel(sr: int = SR, n_fft: int = N_FFT, n_mels: int = N_MELS) -> n
 _MEL_FB = _filterbank_mel()
 
 
-def _potong_log_mel(path_wav: Path) -> np.ndarray:
-    sr_asli, y = wavfile.read(path_wav)
+def _normalisasi_gelombang(y: np.ndarray) -> np.ndarray:
     if y.ndim > 1:
         y = y.mean(axis=1)
+    if np.issubdtype(y.dtype, np.integer):
+        return y.astype(np.float32) / 32768.0
     y = y.astype(np.float32)
     if np.abs(y).max() > 1.0:
         y /= 32768.0
+    return y
+
+
+def _ekstrak_log_mel(y: np.ndarray, sr_asli: int) -> np.ndarray:
+    y = _normalisasi_gelombang(y)
     if sr_asli != SR:
         y = resample_poly(y, SR, sr_asli).astype(np.float32)
 
     y = y[SR:]  # buang 1 detik pertama setiap kondisi (fase transien akselerasi)
     n_segmen = len(y) // SR
+    if n_segmen <= 0:
+        raise ValueError(f"Durasi audio setelah membuang transien 1 detik terlalu pendek ({len(y)} sampel).")
 
     segmen = []
     for i in range(n_segmen):
@@ -79,6 +87,57 @@ def _potong_log_mel(path_wav: Path) -> np.ndarray:
         log_mel -= log_mel.max()
         segmen.append(log_mel.astype(np.float32))
     return np.stack(segmen)
+
+
+def _potong_log_mel(path_wav: Path) -> np.ndarray:
+    sr_asli, y = wavfile.read(path_wav)
+    return _ekstrak_log_mel(y, int(sr_asli))
+
+
+class _PembacaAudioTerindeks:
+    """Memotong audio per kondisi dari rekaman kontinu menggunakan audio_index.csv."""
+
+    def __init__(self, folder_audio: Path, path_indeks: Path) -> None:
+        self.folder_audio = folder_audio
+        df_idx = pd.read_csv(path_indeks).copy()
+        df_idx["t_akhir_host"] = df_idx["t_mulai_host"] + df_idx["jumlah_sampel"] / df_idx["sample_rate"]
+        self.df_idx = df_idx.sort_values("t_mulai_host").reset_index(drop=True)
+        self._cache: dict[str, tuple[int, np.ndarray]] = {}
+
+    def _baca_berkas(self, nama_berkas: str) -> tuple[int, np.ndarray]:
+        if nama_berkas not in self._cache:
+            # Simpan hanya beberapa potong berkas terakhir agar konsumsi RAM tetap kecil.
+            if len(self._cache) >= 4:
+                self._cache.pop(next(iter(self._cache)))
+            sr, wav = wavfile.read(self.folder_audio / nama_berkas)
+            self._cache[nama_berkas] = (int(sr), wav)
+        return self._cache[nama_berkas]
+
+    def potong_kondisi(self, t_mulai: float, t_selesai: float) -> tuple[np.ndarray, int]:
+        kandidat = self.df_idx[
+            (self.df_idx["t_akhir_host"] > t_mulai) & (self.df_idx["t_mulai_host"] < t_selesai)
+        ]
+        potongan = []
+        sr_kondisi = None
+        for _, baris in kandidat.iterrows():
+            ov0 = max(t_mulai, float(baris["t_mulai_host"]))
+            ov1 = min(t_selesai, float(baris["t_akhir_host"]))
+            if ov1 <= ov0:
+                continue
+            sr, wav = self._baca_berkas(str(baris["berkas"]))
+            if sr_kondisi is None:
+                sr_kondisi = sr
+            elif sr != sr_kondisi:
+                raise ValueError(f"Sample rate tidak konsisten antar berkas audio ({sr} vs {sr_kondisi}).")
+            s0 = max(0, int(round((ov0 - float(baris["t_mulai_host"])) * sr)))
+            s1 = min(len(wav), int(round((ov1 - float(baris["t_mulai_host"])) * sr)))
+            if s1 > s0:
+                potongan.append(wav[s0:s1])
+        if not potongan or sr_kondisi is None:
+            raise FileNotFoundError(
+                f"Potongan audio tidak ditemukan untuk rentang waktu [{t_mulai}, {t_selesai}]."
+            )
+        return np.concatenate(potongan), sr_kondisi
 
 
 def _nomor_ulangan(val) -> int:
@@ -113,14 +172,18 @@ def _cari_folder_sesi(folder_sesi: str | Path | None) -> Path:
 
 def _cari_csv_metadata(folder: Path) -> Path:
     # Prioritaskan label.csv, kemudian CSV metadata lain yang memiliki kolom Ulangan
+    abaikan_csv = {
+        "daya.csv", "sensor.csv", "lingkungan.csv", "daya_sensor.csv",
+        "audio_index.csv", "aktuator.csv", "digital.csv", "imu.csv",
+    }
     calon = list(folder.glob("label.csv")) or list(folder.glob("*label*.csv"))
     if not calon:
         for f in sorted(folder.glob("*.csv")):
-            if f.name.lower() in ("daya.csv", "sensor.csv", "lingkungan.csv", "daya_sensor.csv"):
+            if f.name.lower() in abaikan_csv:
                 continue
             try:
                 kolom = pd.read_csv(f, nrows=1).columns
-                if any(c in kolom for c in ("Ulangan", "ulangan", "rep", "Kondisi_ID", "PWM_Kipas")):
+                if any(c in kolom for c in ("Ulangan", "ulangan", "rep", "Kondisi_ID", "PWM_Kipas", "kipas")):
                     calon.append(f)
                     break
             except Exception:
@@ -142,13 +205,15 @@ def _temukan_file_audio(folder_audio: Path, row: pd.Series, kol_audio: str | Non
         if (folder_audio / p.name).is_file():
             return folder_audio / p.name
 
-    # 2. Cocokkan berdasarkan kolom No (misal No: 1 -> kondisi_001.wav, audio_001.wav, dll)
-    if "No" in row and pd.notna(row["No"]):
+    # 2. Cocokkan berdasarkan kolom No / no (misal No: 1 -> kondisi_001.wav, audio-0001.wav, dll)
+    no_val = row.get("No", row.get("no"))
+    if pd.notna(no_val):
         try:
-            no = int(row["No"])
+            no = int(no_val)
             pola_list = (
                 f"kondisi_{no:03d}.wav",
                 f"audio_{no:03d}.wav",
+                f"audio-{no:04d}.wav",
                 f"*{no:03d}*.wav",
                 f"kondisi_{no}.wav",
                 f"{no}.wav",
@@ -168,7 +233,7 @@ def _temukan_file_audio(folder_audio: Path, row: pd.Series, kol_audio: str | Non
             return temu[0]
 
     raise FileNotFoundError(
-        f"Berkas audio tidak ditemukan untuk kondisi (No={row.get('No', '?')}, "
+        f"Berkas audio tidak ditemukan untuk kondisi (No={no_val if pd.notna(no_val) else '?'}, "
         f"Kondisi_ID={row.get('Kondisi_ID', '?')}) di dalam {folder_audio}."
     )
 
@@ -193,6 +258,10 @@ def muat(folder_sesi: str | Path | None = None):
             "atau berikan path folder_sesi saat memanggil muat()."
         )
 
+    path_indeks = folder / "audio_index.csv"
+    pakai_indeks = path_indeks.is_file() and {"t_mulai_host", "t_selesai_host"}.issubset(df.columns)
+    pembaca = _PembacaAudioTerindeks(folder_audio, path_indeks) if pakai_indeks else None
+
     semua_ulangan = sorted({_nomor_ulangan(v) for v in df[kol_ulangan]})
     ulangan_non_uji = np.array([u for u in semua_ulangan if u not in ULANGAN_UJI])
     idx_tr, idx_va = split.indeks(len(ulangan_non_uji))
@@ -210,8 +279,12 @@ def muat(folder_sesi: str | Path | None = None):
         else:
             kunci = "uji"
 
-        path_wav = _temukan_file_audio(folder_audio, row, kol_audio)
-        fitur = _potong_log_mel(path_wav)
+        if pembaca is not None:
+            y_raw, sr_asli = pembaca.potong_kondisi(float(row["t_mulai_host"]), float(row["t_selesai_host"]))
+            fitur = _ekstrak_log_mel(y_raw, sr_asli)
+        else:
+            path_wav = _temukan_file_audio(folder_audio, row, kol_audio)
+            fitur = _potong_log_mel(path_wav)
         target = _ambil_pwm(row)
 
         data[kunci]["X"].append(fitur)
