@@ -2,8 +2,8 @@
 
 | NIM | Model | seed | val_mae | val_rmse | test_mae | durasi (s) | perangkat |
 |---|---|---|---|---|---|---|---|
-| baseline | baseline | 1 | 11.2870 | 14.3658 | — | 5 | cpu laptop |
-| 123450067 | tl | 1 | 7.9610 | 10.3883 | — | 6 | cpu laptop |
-| 123450086 | trf | 1 | 1.8669 | 2.5726 | — | 50 | cpu laptop |
-| 123450102 | ae | 1 | 3.6025 | 5.3342 | — | 17 | cpu laptop |
-| 123450104 | cnn | 1 | 6.6850 | 8.4950 | — | 19 | cpu laptop |
+| baseline | baseline | 1 | 15.0246 | 18.9038 | — | 7 | cpu laptop |
+| 123450067 | tl | 1 | 8.5752 | 19.5495 | — | 144 | cpu laptop |
+| 123450086 | trf | 1 | 4.4062 | 13.3549 | — | 50 | cpu laptop |
+| 123450102 | ae | 1 | 5.0314 | 9.9580 | — | 20 | cpu laptop |
+| 123450104 | cnn | 1 | 20.0861 | 27.5971 | — | 20 | cpu laptop |
