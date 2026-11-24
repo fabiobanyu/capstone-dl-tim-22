@@ -35,13 +35,18 @@ Seluruh uji coba di bawah ini dijalankan pada data simulasi 270 kondisi (`data_h
    - *MobileNetV3-Small* memiliki total *stride* 32 sehingga input `64x30` tereduksi menjadi `2x1` sebelum *pooling*. Mengubah ukuran spasial ke `(96, 96)` menurunkan `val_mae` parsial dari `22.5021` menjadi `11.0899`.
    - Penambahan adaptor `Conv2d(1, 3) + BatchNorm2d` beserta 2 *epoch* *warmup* sebelum *fine-tuning* menurunkan `val_mae` lebih lanjut menjadi `1.9434` (`0.76%` *duty*) dalam waktu 251.9 detik.
 
-## Hasil 3 seed konfigurasi akhir
+## Hasil pada data primer meja (`sesi-20261117-220432`)
 
-Pada data simulasi saat ini baru dijalankan `seed 1` (`val_mae = 1.943447`, `val_rmse = 2.808664`, `val_r2 = 0.99884`, `durasi_detik = 251.9`). Pengujian 3 seed (`--seed 1 2 3`), pengukuran ukuran ONNX, serta latensi inferensi akan diisi setelah data rekaman fisik meja uji tersedia.
+Pelatihan Sprint 1 dijalankan pada data primer meja uji (`data_hash: c70ef6fa3c33a2da1ff7d7050f56af9b`, `n_train=3711`, `n_val=338`, `seed 1`) memakai konfigurasi akhir `MobileNetV3-Small` (`96x96`, adaptor `Conv2d(1 -> 3) + BatchNorm2d`, 2 *epoch* *warmup* + 8 *epoch* *fine-tuning*). Pengujian 3 seed (`--seed 1 2 3`), penyetelan lanjutan, pengukuran ukuran ONNX, dan latensi inferensi dilanjutkan pada Sprint 2.
 
 | Random Seed | Val MAE (PWM) | Val MAE (% duty) | Val RMSE | Val R² | Durasi (s) |
 | :--- | :--- | :--- | :--- | :--- | :--- |
-| Seed 1 (Simulasi) | `1.943447` | `0.76%` | `2.808664` | `0.99884` | `251.9` |
-| Seed 2 | *Menunggu data meja* | - | - | - | - |
-| Seed 3 | *Menunggu data meja* | - | - | - | - |
+| Seed 1 (Data Primer) | `8.536732` | `3.35%` | `16.803044` | `0.958426` | `219.6` |
+| Seed 2 | *Sprint 2* | - | - | - | - |
+| Seed 3 | *Sprint 2* | - | - | - | - |
 | **Rata-rata ± Std** | **-** | **-** | **-** | **-** | **-** |
+
+Perbandingan sementara pada data primer (`n_val=338`, `data_hash: c70ef6fa3c33a2da1ff7d7050f56af9b`):
+- Baseline ridge starter: `val_mae = 15.024312` (`5.89%` *duty*), `val_rmse = 18.903305`, `val_r2 = 0.947384`.
+- Transfer Learning (`123450067`, seed 1): `val_mae = 8.536732` (`3.35%` *duty*), `val_rmse = 16.803044`, `val_r2 = 0.958426` (lebih rendah `2.54` poin persen *duty* dibandingkan baseline ridge; pembanding non-DL MFCC + Random Forest/SVM dari kartu `#8` belum tersedia di repo).
+- Arsip uji simulasi sebelumnya (`seed 1`, `data_hash: a8922184f4e06b82ad3c1125e53e4506`, `n_val=342`): `val_mae = 1.943447` (`0.76%` *duty*), `val_rmse = 2.808664`, `val_r2 = 0.99884`.
