@@ -16,7 +16,7 @@ Model memakai **AdamW** dengan laju pembelajaran bertingkat (*discriminative lea
 
 ## Pencarian hyperparameter (data simulasi)
 
-Seluruh uji coba di bawah ini dijalankan pada data simulasi 270 kondisi (`data_hash: a8922184f4e06b82ad3c1125e53e4506`, `n_train=3762`, `n_val=342`, `batch_size=32`, CPU laptop). Angka masih bersifat sementara hingga data rekaman fisik meja uji tersedia.
+Seluruh uji coba di bawah ini dijalankan pada data simulasi 270 kondisi (`data_hash: a8922184f4e06b82ad3c1125e53e4506`, `n_train=3762`, `n_val=342`, `batch_size=32`, CPU laptop). Tabel ini disimpan sebagai arsip pencarian konfigurasi awal sebelum data rekaman fisik meja uji tersedia; hasil pelatihan pada data primer dicatat pada bagian akhir dokumen ini.
 
 | ID | Backbone & Input | Strategi Pembekuan | Epoch | LR (Head / Backbone) | Val MAE (PWM / % duty) | Val RMSE | Val R² | Durasi (s) |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
