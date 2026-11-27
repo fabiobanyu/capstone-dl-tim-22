@@ -2,7 +2,7 @@
 
     python run_all.py [--seeds 1 2 3] [--final] [--hanya <nim> ...]
 
-Menjalankan baseline dosen dan ``models/<nim>/run.py`` setiap anggota untuk tiap seed, lalu
+Menjalankan pembanding MFCC tim dan ``models/<nim>/run.py`` setiap anggota untuk tiap seed, lalu
 merakit ``reports/hasil_komparasi.md`` dari ``results/*/metrics.json`` (hanya seed terakhir
 yang tersimpan di metrics.json; sebaran antar-seed dicatat dari keluaran tiap run).
 """
@@ -33,7 +33,7 @@ def main() -> None:
     a = ap.parse_args()
 
     if not a.tanpa_baseline:
-        jalankan([sys.executable, "-m", "src.common.baseline", "--seed", str(a.seeds[0])])
+        jalankan([sys.executable, "-m", "src.baseline_mfcc", "--seed", str(a.seeds[0])])
     anggota = sorted(p for p in (AKAR / "models").iterdir() if p.is_dir() and (p / "run.py").exists()
                      and p.name != "TEMPLATE" and (a.hanya is None or p.name in a.hanya))
     ringkas: dict[str, list[dict]] = {}
@@ -50,16 +50,27 @@ def main() -> None:
 
     regresi = data.TUGAS == "regresi"
     kolom = ("val_mae", "val_rmse", "test_mae") if regresi else ("val_acc", "val_macro_f1", "test_acc")
-    baris = [f"| NIM | Model | seed | {kolom[0]} | {kolom[1]} | {kolom[2]} | durasi (s) | perangkat |", "|---|---|---|---|---|---|---|---|"]
+    if regresi:
+        baris = [
+            "| NIM | Model | seed | MAE val (% duty) | MAE val (PWM) | RMSE val (PWM) | MAE uji (PWM) | durasi (s) | perangkat |",
+            "|---|---|---|---|---|---|---|---|---|",
+        ]
+    else:
+        baris = [
+            f"| NIM | Model | seed | {kolom[0]} | {kolom[1]} | {kolom[2]} | durasi (s) | perangkat |",
+            "|---|---|---|---|---|---|---|---|",
+        ]
 
     def baris_hasil(nim: str, h: dict) -> str:
         mt = h["metrik"]
         angka = [f"{mt[k]:.4f}" if k in mt else "—" for k in kolom]
+        if regresi:
+            angka.insert(0, f"{mt['val_mae'] / 255 * 100:.2f}" if "val_mae" in mt else "—")
         return (f"| {nim} | {h.get('model', '')} | {h['seed']} | "
                 f"{' | '.join(angka)} | {h.get('durasi_detik', 0):.0f} | {h.get('perangkat', '')} |")
 
     bl = AKAR / "results" / "baseline" / "metrics.json"
-    if bl.exists():
+    if bl.exists() and not a.tanpa_baseline:
         h = json.loads(bl.read_text("utf-8"))
         baris.append(baris_hasil("baseline", h))
     for nim, daftar in ringkas.items():

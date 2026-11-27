@@ -46,6 +46,9 @@ lewat *pull request* ke `main`:
 
    Hasilnya di `results/baseline/metrics.json`: batas bawah yang harus dilampaui setiap model.
 
+   Sejak Sprint 1, Tim 22 memakai jalur itu untuk pembanding MFCC. Jika menjalankan pemeriksaan
+   ridge starter lagi, jalankan ulang pembanding Tim 22 untuk memulihkan hasil yang dipakai tim.
+
 Setelah *pull request* protokol digabung, `src/protokol/` tidak diubah lagi sampai akhir;
 perubahan hanya lewat *pull request* yang disetujui pembimbing.
 
@@ -61,7 +64,18 @@ perubahan hanya lewat *pull request* yang disetujui pembimbing.
    Setiap run menulis `results/<nim>/metrics.json` lewat `src.common.evaluate`; Local Runner
    memeriksanya (skema `metrik/seed/data_hash`, isi sama dengan HEAD) saat *Periksa artefak*
    ditekan di aplikasi DSWorkbench.
-3. Perintah reproduksi tim (dinilai pada sprint terakhir): `python run_all.py`.
+3. Reproduksi demo Sprint 1 dari akar repo, dengan data primer di folder yang tercantum dalam
+   manifes tim:
+
+   ```bash
+   pip install -r requirements.txt
+   python run_all.py --seeds 1
+   ```
+
+   Perintah itu melatih pembanding MFCC + Random Forest dan keempat jalur pada pembagian ulangan
+   yang sama. Tabel validasi ditulis ke `reports/hasil_komparasi.md` dan MAE dilaporkan dalam
+   persen duty dengan membagi MAE PWM dengan 255 lalu dikali 100. Untuk menjalankan pembanding
+   saja, gunakan `python -m src.baseline_mfcc --seed 1`.
 
 ## Yang dibakukan untuk semua tim
 
